@@ -106,7 +106,7 @@ app.MapPost("/api/analisis", async (HttpRequest request) =>
             Console.WriteLine($"Error en inferencia ONNX: {ex.Message}");
         }
     }
-
+    Console.WriteLine($"--> [API] Audio recibido ({audioBytes.Length} bytes) | Resultado: {etiquetaFinal} ({Math.Round(confianzaFinal, 2)})");
     return Results.Ok(new
     {
         resultado = etiquetaFinal,
