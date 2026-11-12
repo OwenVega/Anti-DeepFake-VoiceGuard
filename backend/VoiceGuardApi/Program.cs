@@ -42,6 +42,11 @@ app.MapPost("/api/analisis", async (HttpRequest request) =>
     {
         return Results.BadRequest(new { error = "Solo se admiten archivos .wav." });
     }
+    const long maxBytes = 1024 * 1024; // 1 MB
+    if (audioFile.Length > maxBytes)
+    {
+        return Results.BadRequest(new { error = "El archivo supera el tamaño máximo permitido de 1 MB." });
+    }
 
     // Leer bytes del archivo de audio
     using var ms = new MemoryStream();
