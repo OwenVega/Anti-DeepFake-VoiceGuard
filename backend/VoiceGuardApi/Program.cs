@@ -43,6 +43,13 @@ app.MapPost("/api/analisis", async (HttpRequest request) =>
         return Results.BadRequest(new { error = "Solo se admiten archivos .wav." });
     }
 
+    // Validar tamaño máximo de 1 MB (HU-02 / BUG-04)
+    const long maxBytes = 1024 * 1024;
+    if (audioFile.Length > maxBytes)
+    {
+        return Results.BadRequest(new { error = "El archivo supera el tamaño máximo permitido de 1 MB." });
+    }
+
     // Leer bytes del archivo de audio
     using var ms = new MemoryStream();
     await audioFile.CopyToAsync(ms);
@@ -52,7 +59,7 @@ app.MapPost("/api/analisis", async (HttpRequest request) =>
     float confianzaFinal = 0.88f;
 
     // 2. Inferencia con ONNX
-    if (session != null && audioBytes.Length > 44) // Validar cabecera WAV
+    if (session != null && audioBytes.Length > 44)
     {
         try
         {
@@ -67,7 +74,7 @@ app.MapPost("/api/analisis", async (HttpRequest request) =>
                 floatAudio[i] = sample / 32768.0f;
             }
 
-            // Crear tensor de entrada [1, 1, 16000]
+            // Crear tensor de entrada
             var inputTensor = new DenseTensor<float>(floatAudio, new[] { 1, maxSamples });
             var inputName = session.InputMetadata.Keys.First();
 
@@ -80,15 +87,9 @@ app.MapPost("/api/analisis", async (HttpRequest request) =>
             using var results = session.Run(inputs);
             var output = results.First().AsEnumerable<float>().ToArray();
 
-            // Salida: [prob_real, prob_sintetica]
-            // Tomamos el valor de salida (si bota números locos, aplicamos Sigmoide)
             float rawScore = output[0];
-            
-            // Fórmula Sigmoide para asegurar que la confianza esté estrictamente entre 0.0 y 1.0
             float confianzaNormalizada = 1.0f / (1.0f + (float)Math.Exp(-rawScore));
 
-            // Si pasa de 0.5 lo catalogamos como sintética, sino real
-            // Si la probabilidad es >= 0.5 ahora es "real", sino "sintetica"
             if (confianzaNormalizada >= 0.5f)
             {
                 etiquetaFinal = "real";
@@ -99,7 +100,6 @@ app.MapPost("/api/analisis", async (HttpRequest request) =>
                 etiquetaFinal = "sintetica";
                 confianzaFinal = 1.0f - confianzaNormalizada;
             }
-          
         }
         catch (Exception ex)
         {
@@ -115,4 +115,4 @@ app.MapPost("/api/analisis", async (HttpRequest request) =>
     });
 });
 
-app.Run("http://localhost:5000");
+app.Run("http://0.0.0.0:5000");
